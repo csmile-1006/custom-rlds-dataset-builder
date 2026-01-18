@@ -1,13 +1,70 @@
-from typing import Iterator, Tuple, Any
-
-import os
-import h5py
 import glob
+import os
+from typing import Any, Iterator, Tuple
+
+import h5py
 import numpy as np
-import tensorflow as tf
 import tensorflow_datasets as tfds
-import sys
+
 from LIBERO_Spatial.conversion_utils import MultiThreadedDatasetBuilder
+
+
+def _get_features_dict():
+    """Returns the common features dictionary for all LIBERO Spatial datasets."""
+    return tfds.features.FeaturesDict(
+        {
+            "steps": tfds.features.Dataset(
+                {
+                    "observation": tfds.features.FeaturesDict(
+                        {
+                            "image": tfds.features.Image(
+                                shape=(256, 256, 3),
+                                dtype=np.uint8,
+                                encoding_format="jpeg",
+                                doc="Main camera RGB observation.",
+                            ),
+                            "wrist_image": tfds.features.Image(
+                                shape=(256, 256, 3),
+                                dtype=np.uint8,
+                                encoding_format="jpeg",
+                                doc="Wrist camera RGB observation.",
+                            ),
+                            "state": tfds.features.Tensor(
+                                shape=(8,),
+                                dtype=np.float32,
+                                doc="Robot EEF state (6D pose, 2D gripper).",
+                            ),
+                            "joint_state": tfds.features.Tensor(
+                                shape=(7,),
+                                dtype=np.float32,
+                                doc="Robot joint angles.",
+                            ),
+                        }
+                    ),
+                    "action": tfds.features.Tensor(
+                        shape=(7,),
+                        dtype=np.float32,
+                        doc="Robot EEF action.",
+                    ),
+                    "discount": tfds.features.Scalar(dtype=np.float32, doc="Discount if provided, default to 1."),
+                    "reward": tfds.features.Scalar(
+                        dtype=np.float32, doc="Reward if provided, 1 on final step for demos."
+                    ),
+                    "is_first": tfds.features.Scalar(dtype=np.bool_, doc="True on first step of the episode."),
+                    "is_last": tfds.features.Scalar(dtype=np.bool_, doc="True on last step of the episode."),
+                    "is_terminal": tfds.features.Scalar(
+                        dtype=np.bool_, doc="True on last step of the episode if it is a terminal step, True for demos."
+                    ),
+                    "language_instruction": tfds.features.Text(doc="Language Instruction."),
+                }
+            ),
+            "episode_metadata": tfds.features.FeaturesDict(
+                {
+                    "file_path": tfds.features.Text(doc="Path to the original data file."),
+                }
+            ),
+        }
+    )
 
 
 def _generate_examples(paths) -> Iterator[Tuple[str, Any]]:
@@ -18,52 +75,49 @@ def _generate_examples(paths) -> Iterator[Tuple[str, Any]]:
     def _parse_example(episode_path, demo_id):
         # load raw data
         with h5py.File(episode_path, "r") as F:
-            if f"demo_{demo_id}" not in F['data'].keys():
-                return None # skip episode if the demo doesn't exist (e.g. due to failed demo)
-            actions = F['data'][f"demo_{demo_id}"]["actions"][()]
-            states = F['data'][f"demo_{demo_id}"]["obs"]["ee_states"][()]
-            gripper_states = F['data'][f"demo_{demo_id}"]["obs"]["gripper_states"][()]
-            joint_states = F['data'][f"demo_{demo_id}"]["obs"]["joint_states"][()]
-            images = F['data'][f"demo_{demo_id}"]["obs"]["agentview_rgb"][()]
-            wrist_images = F['data'][f"demo_{demo_id}"]["obs"]["eye_in_hand_rgb"][()]
+            if f"demo_{demo_id}" not in F["data"].keys():
+                return None  # skip episode if the demo doesn't exist (e.g. due to failed demo)
+            actions = F["data"][f"demo_{demo_id}"]["actions"][()]
+            states = F["data"][f"demo_{demo_id}"]["obs"]["ee_states"][()]
+            gripper_states = F["data"][f"demo_{demo_id}"]["obs"]["gripper_states"][()]
+            joint_states = F["data"][f"demo_{demo_id}"]["obs"]["joint_states"][()]
+            images = F["data"][f"demo_{demo_id}"]["obs"]["agentview_rgb"][()]
+            wrist_images = F["data"][f"demo_{demo_id}"]["obs"]["eye_in_hand_rgb"][()]
 
         # compute language instruction
-        raw_file_string = os.path.basename(episode_path).split('/')[-1]
+        raw_file_string = os.path.basename(episode_path).split("/")[-1]
         words = raw_file_string[:-10].split("_")
-        command = ''
+        command = ""
         for w in words:
             if "SCENE" in w:
-                command = ''
+                command = ""
                 continue
-            command = command + w + ' '
+            command = command + w + " "
         command = command[:-1]
 
         # assemble episode --> here we're assuming demos so we set reward to 1 at the end
         episode = []
         for i in range(actions.shape[0]):
-            episode.append({
-                'observation': {
-                    'image': images[i][::-1,::-1],
-                    'wrist_image': wrist_images[i][::-1,::-1],
-                    'state': np.asarray(np.concatenate((states[i], gripper_states[i]), axis=-1), np.float32),
-                    'joint_state': np.asarray(joint_states[i], dtype=np.float32),
-                },
-                'action': np.asarray(actions[i], dtype=np.float32),
-                'discount': 1.0,
-                'reward': float(i == (actions.shape[0] - 1)),
-                'is_first': i == 0,
-                'is_last': i == (actions.shape[0] - 1),
-                'is_terminal': i == (actions.shape[0] - 1),
-                'language_instruction': command,
-            })
+            episode.append(
+                {
+                    "observation": {
+                        "image": images[i][::-1, ::-1],
+                        "wrist_image": wrist_images[i][::-1, ::-1],
+                        "state": np.asarray(np.concatenate((states[i], gripper_states[i]), axis=-1), np.float32),
+                        "joint_state": np.asarray(joint_states[i], dtype=np.float32),
+                    },
+                    "action": np.asarray(actions[i], dtype=np.float32),
+                    "discount": 1.0,
+                    "reward": float(i == (actions.shape[0] - 1)),
+                    "is_first": i == 0,
+                    "is_last": i == (actions.shape[0] - 1),
+                    "is_terminal": i == (actions.shape[0] - 1),
+                    "language_instruction": command,
+                }
+            )
 
         # create output data sample
-        sample = {
-            'steps': episode,
-            'episode_metadata': {
-                'file_path': episode_path
-            }
-        }
+        sample = {"steps": episode, "episode_metadata": {"file_path": episode_path}}
 
         # if you want to skip an example for whatever reason, simply return None
         return episode_path + f"_{demo_id}", sample
@@ -71,7 +125,7 @@ def _generate_examples(paths) -> Iterator[Tuple[str, Any]]:
     # for smallish datasets, use single-thread parsing
     for sample in paths:
         with h5py.File(sample, "r") as F:
-            n_demos = len(F['data'])
+            n_demos = len(F["data"])
         idx = 0
         cnt = 0
         while cnt < n_demos:
@@ -82,86 +136,261 @@ def _generate_examples(paths) -> Iterator[Tuple[str, Any]]:
             yield ret
 
 
-class LIBEROSpatial(MultiThreadedDatasetBuilder):
+class LIBEROSpatialPickUpTheBlackBowlBetweenThePlateAndTheRamekinAndPlaceItOnThePlate(MultiThreadedDatasetBuilder):
     """DatasetBuilder for example dataset."""
 
-    VERSION = tfds.core.Version('1.0.0')
+    VERSION = tfds.core.Version("1.0.0")
     RELEASE_NOTES = {
-      '1.0.0': 'Initial release.',
+        "1.0.0": "Initial release.",
     }
-    N_WORKERS = 40             # number of parallel workers for data conversion
-    MAX_PATHS_IN_MEMORY = 80   # number of paths converted & stored in memory before writing to disk
-                               # -> the higher the faster / more parallel conversion, adjust based on avilable RAM
-                               # note that one path may yield multiple episodes and adjust accordingly
-    PARSE_FCN = _generate_examples      # handle to parse function from file paths to RLDS episodes
+    N_WORKERS = 40  # number of parallel workers for data conversion
+    MAX_PATHS_IN_MEMORY = 80  # number of paths converted & stored in memory before writing to disk
+    # -> the higher the faster / more parallel conversion, adjust based on avilable RAM
+    # note that one path may yield multiple episodes and adjust accordingly
+    PARSE_FCN = _generate_examples  # handle to parse function from file paths to RLDS episodes
 
     def _info(self) -> tfds.core.DatasetInfo:
         """Dataset metadata (homepage, citation,...)."""
-        return self.dataset_info_from_configs(
-            features=tfds.features.FeaturesDict({
-                'steps': tfds.features.Dataset({
-                    'observation': tfds.features.FeaturesDict({
-                        'image': tfds.features.Image(
-                            shape=(256, 256, 3),
-                            dtype=np.uint8,
-                            encoding_format='jpeg',
-                            doc='Main camera RGB observation.',
-                        ),
-                        'wrist_image': tfds.features.Image(
-                            shape=(256, 256, 3),
-                            dtype=np.uint8,
-                            encoding_format='jpeg',
-                            doc='Wrist camera RGB observation.',
-                        ),
-                        'state': tfds.features.Tensor(
-                            shape=(8,),
-                            dtype=np.float32,
-                            doc='Robot EEF state (6D pose, 2D gripper).',
-                        ),
-                        'joint_state': tfds.features.Tensor(
-                            shape=(7,),
-                            dtype=np.float32,
-                            doc='Robot joint angles.',
-                        )
-                    }),
-                    'action': tfds.features.Tensor(
-                        shape=(7,),
-                        dtype=np.float32,
-                        doc='Robot EEF action.',
-                    ),
-                    'discount': tfds.features.Scalar(
-                        dtype=np.float32,
-                        doc='Discount if provided, default to 1.'
-                    ),
-                    'reward': tfds.features.Scalar(
-                        dtype=np.float32,
-                        doc='Reward if provided, 1 on final step for demos.'
-                    ),
-                    'is_first': tfds.features.Scalar(
-                        dtype=np.bool_,
-                        doc='True on first step of the episode.'
-                    ),
-                    'is_last': tfds.features.Scalar(
-                        dtype=np.bool_,
-                        doc='True on last step of the episode.'
-                    ),
-                    'is_terminal': tfds.features.Scalar(
-                        dtype=np.bool_,
-                        doc='True on last step of the episode if it is a terminal step, True for demos.'
-                    ),
-                    'language_instruction': tfds.features.Text(
-                        doc='Language Instruction.'
-                    ),
-                }),
-                'episode_metadata': tfds.features.FeaturesDict({
-                    'file_path': tfds.features.Text(
-                        doc='Path to the original data file.'
-                    ),
-                }),
-            }))
+        return self.dataset_info_from_configs(features=_get_features_dict())
 
     def _split_paths(self):
         """Define filepaths for data splits."""
         return {
-            "train": glob.glob("/PATH/TO/LIBERO/libero/datasets/libero_spatial_no_noops/*.hdf5"),
+            "train": glob.glob(
+                "/home/changyeon/workspace/rise-openpi/examples/libero/datasets/libero_spatial_no_noops/pick_up_the_black_bowl_between_the_plate_and_the_ramekin_and_place_it_on_the_plate_demo.hdf5"
+            ),
+        }
+
+
+class LIBEROSpatialPickUpTheBlackBowlNextToThePlateAndPlaceItOnThePlate(MultiThreadedDatasetBuilder):
+    """DatasetBuilder for example dataset."""
+
+    VERSION = tfds.core.Version("1.0.0")
+    RELEASE_NOTES = {
+        "1.0.0": "Initial release.",
+    }
+    N_WORKERS = 40  # number of parallel workers for data conversion
+    MAX_PATHS_IN_MEMORY = 80  # number of paths converted & stored in memory before writing to disk
+    # -> the higher the faster / more parallel conversion, adjust based on avilable RAM
+    # note that one path may yield multiple episodes and adjust accordingly
+    PARSE_FCN = _generate_examples  # handle to parse function from file paths to RLDS episodes
+
+    def _info(self) -> tfds.core.DatasetInfo:
+        """Dataset metadata (homepage, citation,...)."""
+        return self.dataset_info_from_configs(features=_get_features_dict())
+
+    def _split_paths(self):
+        """Define filepaths for data splits."""
+        return {
+            "train": glob.glob(
+                "/home/changyeon/workspace/rise-openpi/examples/libero/datasets/libero_spatial_no_noops/pick_up_the_black_bowl_next_to_the_plate_and_place_it_on_the_plate_demo.hdf5"
+            ),
+        }
+
+
+class LIBEROSpatialPickUpTheBlackBowlOnTheStoveAndPlaceItOnThePlate(MultiThreadedDatasetBuilder):
+    """DatasetBuilder for example dataset."""
+
+    VERSION = tfds.core.Version("1.0.0")
+    RELEASE_NOTES = {
+        "1.0.0": "Initial release.",
+    }
+    N_WORKERS = 40  # number of parallel workers for data conversion
+    MAX_PATHS_IN_MEMORY = 80  # number of paths converted & stored in memory before writing to disk
+    # -> the higher the faster / more parallel conversion, adjust based on avilable RAM
+    # note that one path may yield multiple episodes and adjust accordingly
+    PARSE_FCN = _generate_examples  # handle to parse function from file paths to RLDS episodes
+
+    def _info(self) -> tfds.core.DatasetInfo:
+        """Dataset metadata (homepage, citation,...)."""
+        return self.dataset_info_from_configs(features=_get_features_dict())
+
+    def _split_paths(self):
+        """Define filepaths for data splits."""
+        return {
+            "train": glob.glob(
+                "/home/changyeon/workspace/rise-openpi/examples/libero/datasets/libero_spatial_no_noops/pick_up_the_black_bowl_on_the_stove_and_place_it_on_the_plate_demo.hdf5"
+            ),
+        }
+
+
+class LIBEROSpatialPickUpTheBlackBowlFromTableCenterAndPlaceItOnThePlate(MultiThreadedDatasetBuilder):
+    """DatasetBuilder for example dataset."""
+
+    VERSION = tfds.core.Version("1.0.0")
+    RELEASE_NOTES = {
+        "1.0.0": "Initial release.",
+    }
+    N_WORKERS = 40  # number of parallel workers for data conversion
+    MAX_PATHS_IN_MEMORY = 80  # number of paths converted & stored in memory before writing to disk
+    # -> the higher the faster / more parallel conversion, adjust based on avilable RAM
+    # note that one path may yield multiple episodes and adjust accordingly
+    PARSE_FCN = _generate_examples  # handle to parse function from file paths to RLDS episodes
+
+    def _info(self) -> tfds.core.DatasetInfo:
+        """Dataset metadata (homepage, citation,...)."""
+        return self.dataset_info_from_configs(features=_get_features_dict())
+
+    def _split_paths(self):
+        """Define filepaths for data splits."""
+        return {
+            "train": glob.glob(
+                "/home/changyeon/workspace/rise-openpi/examples/libero/datasets/libero_spatial_no_noops/pick_up_the_black_bowl_from_table_center_and_place_it_on_the_plate_demo.hdf5"
+            ),
+        }
+
+
+class LIBEROSpatialPickUpTheBlackBowlNextToTheRamekinAndPlaceItOnThePlate(MultiThreadedDatasetBuilder):
+    """DatasetBuilder for example dataset."""
+
+    VERSION = tfds.core.Version("1.0.0")
+    RELEASE_NOTES = {
+        "1.0.0": "Initial release.",
+    }
+    N_WORKERS = 40  # number of parallel workers for data conversion
+    MAX_PATHS_IN_MEMORY = 80  # number of paths converted & stored in memory before writing to disk
+    # -> the higher the faster / more parallel conversion, adjust based on avilable RAM
+    # note that one path may yield multiple episodes and adjust accordingly
+    PARSE_FCN = _generate_examples  # handle to parse function from file paths to RLDS episodes
+
+    def _info(self) -> tfds.core.DatasetInfo:
+        """Dataset metadata (homepage, citation,...)."""
+        return self.dataset_info_from_configs(features=_get_features_dict())
+
+    def _split_paths(self):
+        """Define filepaths for data splits."""
+        return {
+            "train": glob.glob(
+                "/home/changyeon/workspace/rise-openpi/examples/libero/datasets/libero_spatial_no_noops/pick_up_the_black_bowl_next_to_the_ramekin_and_place_it_on_the_plate_demo.hdf5"
+            ),
+        }
+
+
+class LIBEROSpatialPickUpTheBlackBowlOnTheWoodenCabinetAndPlaceItOnThePlate(MultiThreadedDatasetBuilder):
+    """DatasetBuilder for example dataset."""
+
+    VERSION = tfds.core.Version("1.0.0")
+    RELEASE_NOTES = {
+        "1.0.0": "Initial release.",
+    }
+    N_WORKERS = 40  # number of parallel workers for data conversion
+    MAX_PATHS_IN_MEMORY = 80  # number of paths converted & stored in memory before writing to disk
+    # -> the higher the faster / more parallel conversion, adjust based on avilable RAM
+    # note that one path may yield multiple episodes and adjust accordingly
+    PARSE_FCN = _generate_examples  # handle to parse function from file paths to RLDS episodes
+
+    def _info(self) -> tfds.core.DatasetInfo:
+        """Dataset metadata (homepage, citation,...)."""
+        return self.dataset_info_from_configs(features=_get_features_dict())
+
+    def _split_paths(self):
+        """Define filepaths for data splits."""
+        return {
+            "train": glob.glob(
+                "/home/changyeon/workspace/rise-openpi/examples/libero/datasets/libero_spatial_no_noops/pick_up_the_black_bowl_on_the_wooden_cabinet_and_place_it_on_the_plate_demo.hdf5"
+            ),
+        }
+
+
+class LIBEROSpatialPickUpTheBlackBowlInTheTopDrawerOfTheWoodenCabinetAndPlaceItOnThePlate(MultiThreadedDatasetBuilder):
+    """DatasetBuilder for example dataset."""
+
+    VERSION = tfds.core.Version("1.0.0")
+    RELEASE_NOTES = {
+        "1.0.0": "Initial release.",
+    }
+    N_WORKERS = 40  # number of parallel workers for data conversion
+    MAX_PATHS_IN_MEMORY = 80  # number of paths converted & stored in memory before writing to disk
+    # -> the higher the faster / more parallel conversion, adjust based on avilable RAM
+    # note that one path may yield multiple episodes and adjust accordingly
+    PARSE_FCN = _generate_examples  # handle to parse function from file paths to RLDS episodes
+
+    def _info(self) -> tfds.core.DatasetInfo:
+        """Dataset metadata (homepage, citation,...)."""
+        return self.dataset_info_from_configs(features=_get_features_dict())
+
+    def _split_paths(self):
+        """Define filepaths for data splits."""
+        return {
+            "train": glob.glob(
+                "/home/changyeon/workspace/rise-openpi/examples/libero/datasets/libero_spatial_no_noops/pick_up_the_black_bowl_in_the_top_drawer_of_the_wooden_cabinet_and_place_it_on_the_plate_demo.hdf5"
+            ),
+        }
+
+
+class LIBEROSpatialPickUpTheBlackBowlOnTheCookieBoxAndPlaceItOnThePlate(MultiThreadedDatasetBuilder):
+    """DatasetBuilder for example dataset."""
+
+    VERSION = tfds.core.Version("1.0.0")
+    RELEASE_NOTES = {
+        "1.0.0": "Initial release.",
+    }
+    N_WORKERS = 40  # number of parallel workers for data conversion
+    MAX_PATHS_IN_MEMORY = 80  # number of paths converted & stored in memory before writing to disk
+    # -> the higher the faster / more parallel conversion, adjust based on avilable RAM
+    # note that one path may yield multiple episodes and adjust accordingly
+    PARSE_FCN = _generate_examples  # handle to parse function from file paths to RLDS episodes
+
+    def _info(self) -> tfds.core.DatasetInfo:
+        """Dataset metadata (homepage, citation,...)."""
+        return self.dataset_info_from_configs(features=_get_features_dict())
+
+    def _split_paths(self):
+        """Define filepaths for data splits."""
+        return {
+            "train": glob.glob(
+                "/home/changyeon/workspace/rise-openpi/examples/libero/datasets/libero_spatial_no_noops/pick_up_the_black_bowl_on_the_cookie_box_and_place_it_on_the_plate_demo.hdf5"
+            ),
+        }
+
+
+class LIBEROSpatialPickUpTheBlackBowlNextToTheCookieBoxAndPlaceItOnThePlate(MultiThreadedDatasetBuilder):
+    """DatasetBuilder for example dataset."""
+
+    VERSION = tfds.core.Version("1.0.0")
+    RELEASE_NOTES = {
+        "1.0.0": "Initial release.",
+    }
+    N_WORKERS = 40  # number of parallel workers for data conversion
+    MAX_PATHS_IN_MEMORY = 80  # number of paths converted & stored in memory before writing to disk
+    # -> the higher the faster / more parallel conversion, adjust based on avilable RAM
+    # note that one path may yield multiple episodes and adjust accordingly
+    PARSE_FCN = _generate_examples  # handle to parse function from file paths to RLDS episodes
+
+    def _info(self) -> tfds.core.DatasetInfo:
+        """Dataset metadata (homepage, citation,...)."""
+        return self.dataset_info_from_configs(features=_get_features_dict())
+
+    def _split_paths(self):
+        """Define filepaths for data splits."""
+        return {
+            "train": glob.glob(
+                "/home/changyeon/workspace/rise-openpi/examples/libero/datasets/libero_spatial_no_noops/pick_up_the_black_bowl_next_to_the_cookie_box_and_place_it_on_the_plate_demo.hdf5"
+            ),
+        }
+
+
+class LIBEROSpatialPickUpTheBlackBowlOnTheRamekinAndPlaceItOnThePlate(MultiThreadedDatasetBuilder):
+    """DatasetBuilder for example dataset."""
+
+    VERSION = tfds.core.Version("1.0.0")
+    RELEASE_NOTES = {
+        "1.0.0": "Initial release.",
+    }
+    N_WORKERS = 40  # number of parallel workers for data conversion
+    MAX_PATHS_IN_MEMORY = 80  # number of paths converted & stored in memory before writing to disk
+    # -> the higher the faster / more parallel conversion, adjust based on avilable RAM
+    # note that one path may yield multiple episodes and adjust accordingly
+    PARSE_FCN = _generate_examples  # handle to parse function from file paths to RLDS episodes
+
+    def _info(self) -> tfds.core.DatasetInfo:
+        """Dataset metadata (homepage, citation,...)."""
+        return self.dataset_info_from_configs(features=_get_features_dict())
+
+    def _split_paths(self):
+        """Define filepaths for data splits."""
+        return {
+            "train": glob.glob(
+                "/home/changyeon/workspace/rise-openpi/examples/libero/datasets/libero_spatial_no_noops/pick_up_the_black_bowl_on_the_ramekin_and_place_it_on_the_plate_demo.hdf5"
+            ),
         }
