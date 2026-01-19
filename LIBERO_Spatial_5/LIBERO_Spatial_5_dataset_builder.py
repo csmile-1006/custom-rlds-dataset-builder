@@ -136,7 +136,7 @@ def _generate_examples(paths) -> Iterator[Tuple[str, Any]]:
             yield ret
 
 
-class LIBEROSpatialPickUpTheBlackBowlOnTheWoodenCabinetAndPlaceItOnThePlate(MultiThreadedDatasetBuilder):
+class PickUpTheBlackBowlOnTheWoodenCabinetAndPlaceItOnThePlate(MultiThreadedDatasetBuilder):
     """DatasetBuilder for example dataset."""
 
     VERSION = tfds.core.Version("1.0.0")
@@ -160,4 +160,5 @@ class LIBEROSpatialPickUpTheBlackBowlOnTheWoodenCabinetAndPlaceItOnThePlate(Mult
                 "/home/changyeon/workspace/rise-openpi/examples/libero/datasets/libero_spatial_no_noops/pick_up_the_black_bowl_on_the_wooden_cabinet_and_place_it_on_the_plate_demo.hdf5"
             ),
         }
+
 
