@@ -157,7 +157,7 @@ class PutBothTheAlphabetSoupAndTheTomatoSauceInTheBasket(MultiThreadedDatasetBui
         """Define filepaths for data splits."""
         return {
             "train": glob.glob(
-                "/PATH/TO/LIBERO/libero/datasets/libero_10_no_noops/put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket_demo.hdf5"
+                "/home/changyeon/libero_datasets/hdf5/libero_10_no_noops/put_both_the_alphabet_soup_and_the_tomato_sauce_in_the_basket_demo.hdf5"
             ),
         }
 

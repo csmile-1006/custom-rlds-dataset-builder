@@ -157,7 +157,7 @@ class OpenTheMiddleDrawerOfTheCabinet(MultiThreadedDatasetBuilder):
         """Define filepaths for data splits."""
         return {
             "train": glob.glob(
-                "/PATH/TO/LIBERO/libero/datasets/libero_goal_no_noops/open_the_middle_drawer_of_the_cabinet_demo.hdf5"
+                "/home/changyeon/libero_datasets/hdf5/libero_goal_no_noops/open_the_middle_drawer_of_the_cabinet_demo.hdf5"
             ),
         }
 

@@ -157,7 +157,7 @@ class PutTheBlackBowlInTheBottomDrawerOfTheCabinetAndCloseIt(MultiThreadedDatase
         """Define filepaths for data splits."""
         return {
             "train": glob.glob(
-                "/PATH/TO/LIBERO/libero/datasets/libero_10_no_noops/put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it_demo.hdf5"
+                "/home/changyeon/libero_datasets/hdf5/libero_10_no_noops/put_the_black_bowl_in_the_bottom_drawer_of_the_cabinet_and_close_it_demo.hdf5"
             ),
         }
 

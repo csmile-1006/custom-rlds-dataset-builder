@@ -157,7 +157,7 @@ class PickUpTheBookAndPlaceItInTheBackCompartmentOfTheCaddy(MultiThreadedDataset
         """Define filepaths for data splits."""
         return {
             "train": glob.glob(
-                "/PATH/TO/LIBERO/libero/datasets/libero_10_no_noops/pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy_demo.hdf5"
+                "/home/changyeon/libero_datasets/hdf5/libero_10_no_noops/pick_up_the_book_and_place_it_in_the_back_compartment_of_the_caddy_demo.hdf5"
             ),
         }
 

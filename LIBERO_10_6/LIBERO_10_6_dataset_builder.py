@@ -157,7 +157,7 @@ class PutTheWhiteMugOnTheLeftPlateAndPutTheYellowAndWhiteMugOnTheRightPlate(Mult
         """Define filepaths for data splits."""
         return {
             "train": glob.glob(
-                "/PATH/TO/LIBERO/libero/datasets/libero_10_no_noops/put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate_demo.hdf5"
+                "/home/changyeon/libero_datasets/hdf5/libero_10_no_noops/put_the_white_mug_on_the_left_plate_and_put_the_yellow_and_white_mug_on_the_right_plate_demo.hdf5"
             ),
         }
 

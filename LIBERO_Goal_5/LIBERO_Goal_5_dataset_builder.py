@@ -157,7 +157,7 @@ class PushThePlateToTheFrontOfTheStove(MultiThreadedDatasetBuilder):
         """Define filepaths for data splits."""
         return {
             "train": glob.glob(
-                "/PATH/TO/LIBERO/libero/datasets/libero_goal_no_noops/push_the_plate_to_the_front_of_the_stove_demo.hdf5"
+                "/home/changyeon/libero_datasets/hdf5/libero_goal_no_noops/push_the_plate_to_the_front_of_the_stove_demo.hdf5"
             ),
         }
 

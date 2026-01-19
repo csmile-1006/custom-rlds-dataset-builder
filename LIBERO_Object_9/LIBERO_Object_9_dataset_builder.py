@@ -157,7 +157,7 @@ class PickUpTheTomatoSauceAndPlaceItInTheBasket(MultiThreadedDatasetBuilder):
         """Define filepaths for data splits."""
         return {
             "train": glob.glob(
-                "/PATH/TO/LIBERO/libero/datasets/libero_object_no_noops/pick_up_the_tomato_sauce_and_place_it_in_the_basket_demo.hdf5"
+                "/home/changyeon/libero_datasets/hdf5/libero_object_no_noops/pick_up_the_tomato_sauce_and_place_it_in_the_basket_demo.hdf5"
             ),
         }
 

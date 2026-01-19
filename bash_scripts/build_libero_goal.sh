@@ -1,5 +1,5 @@
 for i in {0..9}; do
-    cd LIBERO_goal_$i
+    cd LIBERO_Goal_$i
     tfds build --overwrite
     cd ..
 done

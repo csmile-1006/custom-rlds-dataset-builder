@@ -157,7 +157,7 @@ class OpenTheTopDrawerAndPutTheBowlInside(MultiThreadedDatasetBuilder):
         """Define filepaths for data splits."""
         return {
             "train": glob.glob(
-                "/PATH/TO/LIBERO/libero/datasets/libero_goal_no_noops/open_the_top_drawer_and_put_the_bowl_inside_demo.hdf5"
+                "/home/changyeon/libero_datasets/hdf5/libero_goal_no_noops/open_the_top_drawer_and_put_the_bowl_inside_demo.hdf5"
             ),
         }
 

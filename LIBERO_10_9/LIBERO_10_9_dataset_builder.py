@@ -157,7 +157,7 @@ class TurnOnTheStoveAndPutTheMokaPotOnIt(MultiThreadedDatasetBuilder):
         """Define filepaths for data splits."""
         return {
             "train": glob.glob(
-                "/PATH/TO/LIBERO/libero/datasets/libero_10_no_noops/turn_on_the_stove_and_put_the_moka_pot_on_it_demo.hdf5"
+                "/home/changyeon/libero_datasets/hdf5/libero_10_no_noops/turn_on_the_stove_and_put_the_moka_pot_on_it_demo.hdf5"
             ),
         }
 

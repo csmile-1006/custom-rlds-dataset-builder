@@ -157,7 +157,7 @@ class PutBothTheCreamCheeseBoxAndTheButterInTheBasket(MultiThreadedDatasetBuilde
         """Define filepaths for data splits."""
         return {
             "train": glob.glob(
-                "/PATH/TO/LIBERO/libero/datasets/libero_10_no_noops/put_both_the_cream_cheese_box_and_the_butter_in_the_basket_demo.hdf5"
+                "/home/changyeon/libero_datasets/hdf5/libero_10_no_noops/put_both_the_cream_cheese_box_and_the_butter_in_the_basket_demo.hdf5"
             ),
         }
 

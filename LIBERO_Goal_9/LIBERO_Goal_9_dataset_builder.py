@@ -157,7 +157,7 @@ class PutTheWineBottleOnTheRack(MultiThreadedDatasetBuilder):
         """Define filepaths for data splits."""
         return {
             "train": glob.glob(
-                "/PATH/TO/LIBERO/libero/datasets/libero_goal_no_noops/put_the_wine_bottle_on_the_rack_demo.hdf5"
+                "/home/changyeon/libero_datasets/hdf5/libero_goal_no_noops/put_the_wine_bottle_on_the_rack_demo.hdf5"
             ),
         }
 
